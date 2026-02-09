@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Management App</title>
+    <!-- React and Babel from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const ProjectManagementApp = () => {
+          const [workItems, setWorkItems] = useState([]);
+          const [selectedItem, setSelectedItem] = useState(null);
+          const [showNewItemModal, setShowNewItemModal] = useState(false);
+          const [showTeamModal, setShowTeamModal] = useState(false);
+          const [teamMembers, setTeamMembers] = useState([
+            { id: 1, name: 'Alice Johnson', role: 'Product Manager' },
+            { id: 2, name: 'Bob Smith', role: 'Developer' },
+            { id: 3, name: 'Carol Williams', role: 'Designer' },
+            { id: 4, name: 'David Brown', role: 'Developer' }
+          ]);
+          const [filterStatus, setFilterStatus] = useState('all');
+          const [filterType, setFilterType] = useState('all');
+          const [filterAssignee, setFilterAssignee] = useState('all');
+
+          // Load data from localStorage
+          useEffect(() => {
+            const savedItems = localStorage.getItem('workItems');
+            const savedTeam = localStorage.getItem('teamMembers');
+            if (savedItems) {
+              setWorkItems(JSON.parse(savedItems));
+            }
+            if (savedTeam) {
+              setTeamMembers(JSON.parse(savedTeam));
+            }
+          }, []);
+
+          // Save work items to localStorage
+          useEffect(() => {
+            if (workItems.length > 0) {
+              localStorage.setItem('workItems', JSON.stringify(workItems));
+            }
+          }, [workItems]);
+
+          // Save team members to localStorage
+          useEffect(() => {
+            if (teamMembers.length > 0) {
+              localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
+            }
+          }, [teamMembers]);
+
+          const addWorkItem = (item) => {
+            const newItem = {
+              ...item,
+              id: Date.now(),
+              createdDate: new Date().toISOString(),
+              comments: [],
+              attachments: [],
+              history: [{
+                date: new Date().toISOString(),
+                action: 'Created',
+                user: 'Current User'
+              }]
+            };
+            setWorkItems([...workItems, newItem]);
+            setShowNewItemModal(false);
+          };
+
+          const updateWorkItem = (updatedItem) => {
+            setWorkItems(workItems.map(item => 
+              item.id === updatedItem.id ? {
+                ...updatedItem,
+                history: [
+                  ...updatedItem.history,
+                  {
+                    date: new Date().toISOString(),
+                    action: 'Updated',
+                    user: 'Current User'
+                  }
+                ]
+              } : item
+            ));
+            setSelectedItem(updatedItem);
+          };
+
+          const deleteWorkItem = (id) => {
+            setWorkItems(workItems.filter(item => item.id !== id));
+            if (selectedItem?.id === id) {
+              setSelectedItem(null);
+            }
+          };
+
+          const addComment = (itemId, comment) => {
+            const newComment = {
+              id: Date.now(),
+              text: comment,
+              user: 'Current User',
+              date: new Date().toISOString()
+            };
+            
+            const updatedItems = workItems.map(item => {
+              if (item.id === itemId) {
+                return {
+                  ...item,
+                  comments: [...(item.comments || []), newComment]
+                };
+              }
+              return item;
+            });
+            
+            setWorkItems(updatedItems);
+            if (selectedItem?.id === itemId) {
+              setSelectedItem({
+                ...selectedItem,
+                comments: [...(selectedItem.comments || []), newComment]
+              });
+            }
+          };
+
+          const addAttachment = (itemId, attachment) => {
+            const newAttachment = {
+              id: Date.now(),
+              name: attachment,
+              date: new Date().toISOString()
+            };
+            
+            const updatedItems = workItems.map(item => {
+              if (item.id === itemId) {
+                return {
+                  ...item,
+                  attachments: [...(item.attachments || []), newAttachment]
+                };
+              }
+              return item;
+            });
+            
+            setWorkItems(updatedItems);
+            if (selectedItem?.id === itemId) {
+              setSelectedItem({
+                ...selectedItem,
+                attachments: [...(selectedItem.attachments || []), newAttachment]
+              });
+            }
+          };
+
+          const addTeamMember = (member) => {
+            const newMember = {
+              ...member,
+              id: Date.now()
+            };
+            setTeamMembers([...teamMembers, newMember]);
+          };
+
+          const removeTeamMember = (id) => {
+            setTeamMembers(teamMembers.filter(member => member.id !== id));
+          };
+
+          const filteredItems = workItems.filter(item => {
+            if (filterStatus !== 'all' && item.status !== filterStatus) return false;
+            if (filterType !== 'all' && item.type !== filterType) return false;
+            if (filterAssignee !== 'all' && item.assignedTo !== filterAssignee) return false;
+            return true;
+          });
+
+          // New Item Modal
+          const NewItemModal = () => {
+            const [formData, setFormData] = useState({
+              type: 'Story',
+              title: '',
+              description: '',
+              priority: 'Medium',
+              status: 'New',
+              assignedTo: '',
+              estimatedHours: '',
+              tags: ''
+            });
+
+            return (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+                <div className="bg-white rounded p-6 w-96">
+                  <h2 className="text-xl font-bold mb-4">Create New Work Item</h2>
+                  
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Type</label>
+                    <select 
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.type}
+                      onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    >
+                      <option>Epic</option>
+                      <option>Story</option>
+                      <option>Task</option>
+                      <option>Bug</option>
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Title</label>
+                    <input 
+                      type="text"
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.title}
+                      onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Description</label>
+                    <textarea 
+                      className="w-full border rounded px-3 py-2"
+                      rows="3"
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Priority</label>
+                    <select 
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.priority}
+                      onChange={(e) => setFormData({...formData, priority: e.target.value})}
+                    >
+                      <option>Low</option>
+                      <option>Medium</option>
+                      <option>High</option>
+                      <option>Critical</option>
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Status</label>
+                    <select 
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.status}
+                      onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    >
+                      <option>New</option>
+                      <option>In Progress</option>
+                      <option>Review</option>
+                      <option>Done</option>
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Assign To</label>
+                    <select 
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.assignedTo}
+                      onChange={(e) => setFormData({...formData, assignedTo: e.target.value})}
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers.map(member => (
+                        <option key={member.id} value={member.name}>{member.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">Estimated Hours</label>
+                    <input 
+                      type="number"
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.estimatedHours}
+                      onChange={(e) => setFormData({...formData, estimatedHours: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1">Tags (comma separated)</label>
+                    <input 
+                      type="text"
+                      className="w-full border rounded px-3 py-2"
+                      value={formData.tags}
+                      onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+                      onClick={() => {
+                        if (formData.title) {
+                          addWorkItem({
+                            ...formData,
+                            tags: formData.tags.split(',').map(t => t.trim()).filter(t => t)
+                          });
+                        }
+                      }}
+                    >
+                      Create
+                    </button>
+                    <button 
+                      className="flex-1 border py-2 rounded hover:bg-gray-50"
+                      onClick={() => setShowNewItemModal(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          // Team Modal
+          const TeamModal = () => {
+            const [newMember, setNewMember] = useState({ name: '', role: '' });
+
+            return (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+                <div className="bg-white rounded p-6 w-96">
+                  <h2 className="text-xl font-bold mb-4">Manage Team</h2>
+                  
+                  <div className="mb-4">
+                    <h3 className="font-medium mb-2">Add New Member</h3>
+                    <input 
+                      type="text"
+                      className="w-full border rounded px-3 py-2 mb-2"
+                      placeholder="Name"
+                      value={newMember.name}
+                      onChange={(e) => setNewMember({...newMember, name: e.target.value})}
+                    />
+                    <input 
+                      type="text"
+                      className="w-full border rounded px-3 py-2 mb-2"
+                      placeholder="Role"
+                      value={newMember.role}
+                      onChange={(e) => setNewMember({...newMember, role: e.target.value})}
+                    />
+                    <button 
+                      className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+                      onClick={() => {
+                        if (newMember.name && newMember.role) {
+                          addTeamMember(newMember);
+                          setNewMember({ name: '', role: '' });
+                        }
+                      }}
+                    >
+                      Add Member
+                    </button>
+                  </div>
+
+                  <div className="mb-4">
+                    <h3 className="font-medium mb-2">Current Team</h3>
+                    <div className="max-h-48 overflow-y-auto">
+                      {teamMembers.map(member => (
+                        <div key={member.id} className="flex justify-between items-center p-2 border-b">
+                          <div>
+                            <div className="font-medium">{member.name}</div>
+                            <div className="text-sm text-gray-500">{member.role}</div>
+                          </div>
+                          <button 
+                            className="text-red-600 hover:text-red-800"
+                            onClick={() => removeTeamMember(member.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button 
+                    className="w-full border py-2 rounded hover:bg-gray-50"
+                    onClick={() => setShowTeamModal(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            );
+          };
+
+          // Work Item Row
+          const WorkItemRow = ({ item }) => {
+            const getTypeIcon = (type) => {
+              switch(type) {
+                case 'Epic': return '📚';
+                case 'Story': return '📖';
+                case 'Task': return '✓';
+                case 'Bug': return '🐛';
+                default: return '•';
+              }
+            };
+
+            const getPriorityColor = (priority) => {
+              switch(priority) {
+                case 'Critical': return 'bg-red-100 text-red-800';
+                case 'High': return 'bg-orange-100 text-orange-800';
+                case 'Medium': return 'bg-yellow-100 text-yellow-800';
+                case 'Low': return 'bg-green-100 text-green-800';
+                default: return 'bg-gray-100 text-gray-800';
+              }
+            };
+
+            return (
+              <div 
+                className={`p-3 border-b cursor-pointer hover:bg-gray-50 ${selectedItem?.id === item.id ? 'bg-blue-50' : ''}`}
+                onClick={() => setSelectedItem(item)}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">{getTypeIcon(item.type)}</span>
+                  <span className="font-medium flex-1">{item.title}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${getPriorityColor(item.priority)}`}>
+                    {item.priority}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-500 ml-7">
+                  <span>#{item.id}</span>
+                  <span>{item.status}</span>
+                  {item.assignedTo && <span>👤 {item.assignedTo}</span>}
+                  {item.estimatedHours && <span>⏱ {item.estimatedHours}h</span>}
+                </div>
+              </div>
+            );
+          };
+
+          // Detail Panel
+          const DetailPanel = ({ item }) => {
+            const [editMode, setEditMode] = useState(false);
+            const [editedItem, setEditedItem] = useState(item);
+            const [newComment, setNewComment] = useState('');
+            const [newAttachment, setNewAttachment] = useState('');
+
+            useEffect(() => {
+              setEditedItem(item);
+            }, [item]);
+
+            const handleSave = () => {
+              updateWorkItem(editedItem);
+              setEditMode(false);
+            };
+
+            return (
+              <div className="h-full overflow-y-auto">
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                  <h2 className="text-lg font-bold">Work Item Details</h2>
+                  <div className="flex gap-2">
+                    {editMode ? (
+                      <>
+                        <button 
+                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                          onClick={handleSave}
+                        >
+                          Save
+                        </button>
+                        <button 
+                          className="px-3 py-1 border rounded text-sm hover:bg-gray-100"
+                          onClick={() => {
+                            setEditedItem(item);
+                            setEditMode(false);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button 
+                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                          onClick={() => setEditMode(true)}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                          onClick={() => {
+                            if (confirm('Delete this work item?')) {
+                              deleteWorkItem(item.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  {/* Basic Info */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    {editMode ? (
+                      <input 
+                        type="text"
+                        className="w-full border rounded px-3 py-2"
+                        value={editedItem.title}
+                        onChange={(e) => setEditedItem({...editedItem, title: e.target.value})}
+                      />
+                    ) : (
+                      <div className="text-lg font-medium">{item.title}</div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      {editMode ? (
+                        <select 
+                          className="w-full border rounded px-3 py-2"
+                          value={editedItem.type}
+                          onChange={(e) => setEditedItem({...editedItem, type: e.target.value})}
+                        >
+                          <option>Epic</option>
+                          <option>Story</option>
+                          <option>Task</option>
+                          <option>Bug</option>
+                        </select>
+                      ) : (
+                        <div>{item.type}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      {editMode ? (
+                        <select 
+                          className="w-full border rounded px-3 py-2"
+                          value={editedItem.status}
+                          onChange={(e) => setEditedItem({...editedItem, status: e.target.value})}
+                        >
+                          <option>New</option>
+                          <option>In Progress</option>
+                          <option>Review</option>
+                          <option>Done</option>
+                        </select>
+                      ) : (
+                        <div>{item.status}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      {editMode ? (
+                        <select 
+                          className="w-full border rounded px-3 py-2"
+                          value={editedItem.priority}
+                          onChange={(e) => setEditedItem({...editedItem, priority: e.target.value})}
+                        >
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                          <option>Critical</option>
+                        </select>
+                      ) : (
+                        <div>{item.priority}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                      {editMode ? (
+                        <select 
+                          className="w-full border rounded px-3 py-2"
+                          value={editedItem.assignedTo || ''}
+                          onChange={(e) => setEditedItem({...editedItem, assignedTo: e.target.value})}
+                        >
+                          <option value="">Unassigned</option>
+                          {teamMembers.map(member => (
+                            <option key={member.id} value={member.name}>{member.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div>{item.assignedTo || 'Unassigned'}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
+                      {editMode ? (
+                        <input 
+                          type="number"
+                          className="w-full border rounded px-3 py-2"
+                          value={editedItem.estimatedHours || ''}
+                          onChange={(e) => setEditedItem({...editedItem, estimatedHours: e.target.value})}
+                        />
+                      ) : (
+                        <div>{item.estimatedHours || 'Not set'}</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
+                      <div className="font-mono text-sm">#{item.id}</div>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    {editMode ? (
+                      <textarea 
+                        className="w-full border rounded px-3 py-2"
+                        rows="4"
+                        value={editedItem.description}
+                        onChange={(e) => setEditedItem({...editedItem, description: e.target.value})}
+                      />
+                    ) : (
+                      <div className="text-gray-700">{item.description || 'No description'}</div>
+                    )}
+                  </div>
+
+                  {/* Tags */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {item.tags && item.tags.length > 0 ? (
+                        item.tags.map((tag, index) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                            {tag}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-500 text-sm">No tags</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div className="mb-4 border-t pt-4">
+                    <h3 className="font-medium mb-2">Comments</h3>
+                    <div className="mb-3">
+                      {item.comments && item.comments.length > 0 ? (
+                        item.comments.map(comment => (
+                          <div key={comment.id} className="mb-2 p-2 bg-gray-50 rounded">
+                            <div className="text-sm font-medium">{comment.user}</div>
+                            <div className="text-sm text-gray-600">{comment.text}</div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(comment.date).toLocaleString()}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500">No comments yet</div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        className="flex-1 border rounded px-3 py-2 text-sm"
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newComment.trim()) {
+                            addComment(item.id, newComment);
+                            setNewComment('');
+                          }
+                        }}
+                      />
+                      <button 
+                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                        onClick={() => {
+                          if (newComment.trim()) {
+                            addComment(item.id, newComment);
+                            setNewComment('');
+                          }
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Attachments */}
+                  <div className="mb-4 border-t pt-4">
+                    <h3 className="font-medium mb-2">Attachments</h3>
+                    <div className="mb-3">
+                      {item.attachments && item.attachments.length > 0 ? (
+                        item.attachments.map(attachment => (
+                          <div key={attachment.id} className="mb-1 p-2 bg-gray-50 rounded flex justify-between items-center">
+                            <span className="text-sm">📎 {attachment.name}</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(attachment.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500">No attachments</div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        className="flex-1 border rounded px-3 py-2 text-sm"
+                        placeholder="Attachment name..."
+                        value={newAttachment}
+                        onChange={(e) => setNewAttachment(e.target.value)}
+                      />
+                      <button 
+                        className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        onClick={() => {
+                          if (newAttachment.trim()) {
+                            addAttachment(item.id, newAttachment);
+                            setNewAttachment('');
+                          }
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* History */}
+                  <div className="border-t pt-4">
+                    <h3 className="font-medium mb-2">History</h3>
+                    <div className="space-y-2">
+                      {item.history && item.history.map((entry, index) => (
+                        <div key={index} className="text-sm">
+                          <span className="font-medium">{entry.action}</span>
+                          <span className="text-gray-500"> by {entry.user}</span>
+                          <div className="text-xs text-gray-400">
+                            {new Date(entry.date).toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div className="h-screen flex flex-col">
+              {/* Header */}
+              <div className="bg-blue-600 text-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-3xl font-bold">Project Management</h1>
+                  <div className="flex gap-3">
+                    <button 
+                      className="bg-white text-blue-600 px-4 py-2 rounded hover:bg-gray-100"
+                      onClick={() => setShowTeamModal(true)}
+                    >
+                      Team
+                    </button>
+                    <button 
+                      className="bg-green-600 px-4 py-2 rounded hover:bg-green-700"
+                      onClick={() => setShowNewItemModal(true)}
+                    >
+                      + New Item
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-white border-b p-3 flex gap-4">
+                <div>
+                  <label className="text-sm font-medium mr-2">Status:</label>
+                  <select 
+                    className="border rounded px-3 py-1 text-sm"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="New">New</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Review">Review</option>
+                    <option value="Done">Done</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mr-2">Type:</label>
+                  <select 
+                    className="border rounded px-3 py-1 text-sm"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="Epic">Epic</option>
+                    <option value="Story">Story</option>
+                    <option value="Task">Task</option>
+                    <option value="Bug">Bug</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mr-2">Assignee:</label>
+                  <select 
+                    className="border rounded px-3 py-1 text-sm"
+                    value={filterAssignee}
+                    onChange={(e) => setFilterAssignee(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    {teamMembers.map(member => (
+                      <option key={member.id} value={member.name}>{member.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* Work Items List */}
+                <div className="w-1/2 border-r overflow-y-auto bg-gray-50">
+                  {filteredItems.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="text-center">
+                        <p className="text-lg mb-2">No work items yet</p>
+                        <p className="text-sm">Create an Epic, Story, or Task to get started</p>
+                      </div>
+                    </div>
+                  ) : (
+                    filteredItems.map(item => <WorkItemRow key={item.id} item={item} />)
+                  )}
+                </div>
+
+                {/* Detail Panel */}
+                <div className="w-1/2 bg-white overflow-hidden">
+                  {selectedItem ? (
+                    <DetailPanel item={selectedItem} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <p>Select a work item to view details</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modals */}
+              {showNewItemModal && <NewItemModal />}
+              {showTeamModal && <TeamModal />}
+            </div>
+          );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<ProjectManagementApp />);
+    </script>
+</body>
+</html>
